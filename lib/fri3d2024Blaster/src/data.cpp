@@ -114,7 +114,7 @@ IrDataPacket _data::readIr() // add overload to bypass command type validation?
     if (this->ir1_reader.isDataReady())
     {
         IrDataPacket p(ir1_reader.getPacket());
-        Serial.println(p.get_raw());
+        // Serial.println(p.get_raw());
         p.set_raw(calculateCRC(p.get_raw()));
         if (p.get_crc() == 0)
         {
