@@ -12,6 +12,15 @@
 // CRGB leds[NUM_LEDS];
 CRGBArray<NUM_LEDS> leds;
 
+enum class State {
+    color_palette,
+    charge_loading,
+    fireworks
+};
+
+static State current_state = State::color_palette;
+static unsigned long start_millis_charge_loading;
+
 #define NUM_SPARKS NUM_LEDS / 2 // max number (could be NUM_LEDS / 2)
 float sparkPos[NUM_SPARKS];
 float sparkVel[NUM_SPARKS];
@@ -25,12 +34,29 @@ static const uint8_t charge_leds = NUM_LEDS / charge_times;
 static uint16_t current_charge = 0;
 static TeamColor current_charge_teamColor = TeamColor::eNoTeam;
 static CRGB current_charge_color = CRGB::Black;
-static bool show_fire_works = false;
+
+CRGBPalette16 currentPalette;
+TBlendType    currentBlending;
+
+extern CRGBPalette16 myRedWhiteBluePalette;
+extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
+
+
+
 
 void handle_ir_packet(IrDataPacket packet);
 CRGB map_team_to_color(TeamColor team);
 void flare();
 void explodeLoop();
+void FillLEDsFromPaletteColors( uint8_t colorIndex);
+void ChangePalettePeriodically();
+void SetupTotallyRandomPalette();
+void SetupBlackAndWhiteStripedPalette();
+void SetupPurpleAndGreenPalette();
+void loop_color_palette();
+void loop_charge_loading();
+void loop_fireworks();
+
 
 void setup()
 {
@@ -40,12 +66,10 @@ void setup()
     Serial.println("starting.....");
 
     FastLED.addLeds<WS2812, NEOPIXEL_PIN, RGB_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
-
-    leds.fill_rainbow(HUE_RED, 1);
-    FastLED.show();
-
-    delay(1000);
     FastLED.clear(true);
+
+    currentPalette = RainbowColors_p;
+    currentBlending = LINEARBLEND;    
 
     Data.init();
 }
@@ -56,17 +80,59 @@ void loop()
     // light effect when receiving blaster shot
     handle_ir_packet(Data.readIr());
 
-    if (show_fire_works)
+    switch (current_state)
     {
-        // send up flare
-        flare();
-
-        // explode
-        explodeLoop();
-        show_fire_works = false;
+    case State::color_palette:
+        loop_color_palette();
+        break;
+    
+    case State::charge_loading:
+        loop_charge_loading();
+        break;
+    
+    case State::fireworks:
+        loop_fireworks();
+        break;
     }
 
     delay(100);
+}
+
+void loop_color_palette()
+{
+    ChangePalettePeriodically();
+
+    static uint8_t startIndex = 0;
+    startIndex = startIndex + 1; /* motion speed */
+    
+    FillLEDsFromPaletteColors( startIndex);
+    
+    FastLED.show();
+    FastLED.delay(1000 / FRAMES_PER_SECOND);
+}
+
+void loop_charge_loading()
+{
+    EVERY_N_MILLIS(250)
+    {
+        leds[current_charge] = CRGB::Black;
+        FastLED.show();
+        current_charge -= 1;
+        if (current_charge <= 0)
+        {
+            current_state = State::color_palette;
+        }
+    }
+}
+
+void loop_fireworks()
+{
+    // send up flare
+    flare();
+
+    // explode
+    explodeLoop();
+    current_state = State::color_palette;
 }
 
 void handle_ir_packet(IrDataPacket packet)
@@ -109,10 +175,20 @@ void handle_ir_packet(IrDataPacket packet)
         }
         FastLED.show();
 
+        if (current_charge > 0)
+        {
+            current_state = State::charge_loading;
+            start_millis_charge_loading = millis();
+        }
+        else
+        {
+            current_state = State::color_palette;
+        }
+
         if (current_charge >= charge_times * charge_leds)
         {
             current_charge = 0;
-            show_fire_works = true;
+            current_state = State::fireworks;
         }
     }
 }
@@ -269,3 +345,108 @@ void explodeLoop()
     delay(5);
     FastLED.clear(true);
 }
+
+void FillLEDsFromPaletteColors( uint8_t colorIndex)
+{
+    uint8_t brightness = 255;
+    
+    for( int i = 0; i < NUM_LEDS; ++i) {
+        leds[i] = ColorFromPalette( currentPalette, colorIndex, brightness, currentBlending);
+        colorIndex += 3;
+    }
+}
+
+
+// There are several different palettes of colors demonstrated here.
+//
+// FastLED provides several 'preset' palettes: RainbowColors_p, RainbowStripeColors_p,
+// OceanColors_p, CloudColors_p, LavaColors_p, ForestColors_p, and PartyColors_p.
+//
+// Additionally, you can manually define your own color palettes, or you can write
+// code that creates color palettes on the fly.  All are shown here.
+
+void ChangePalettePeriodically()
+{
+    uint8_t secondHand = (millis() / 1000) % 60;
+    static uint8_t lastSecond = 99;
+    
+    if( lastSecond != secondHand) {
+        lastSecond = secondHand;
+        if( secondHand ==  0)  { currentPalette = RainbowColors_p;         currentBlending = LINEARBLEND; }
+        if( secondHand == 10)  { currentPalette = RainbowStripeColors_p;   currentBlending = NOBLEND;  }
+        if( secondHand == 15)  { currentPalette = RainbowStripeColors_p;   currentBlending = LINEARBLEND; }
+        if( secondHand == 20)  { SetupPurpleAndGreenPalette();             currentBlending = LINEARBLEND; }
+        if( secondHand == 25)  { SetupTotallyRandomPalette();              currentBlending = LINEARBLEND; }
+        if( secondHand == 30)  { SetupBlackAndWhiteStripedPalette();       currentBlending = NOBLEND; }
+        if( secondHand == 35)  { SetupBlackAndWhiteStripedPalette();       currentBlending = LINEARBLEND; }
+        if( secondHand == 40)  { currentPalette = CloudColors_p;           currentBlending = LINEARBLEND; }
+        if( secondHand == 45)  { currentPalette = PartyColors_p;           currentBlending = LINEARBLEND; }
+        if( secondHand == 50)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = NOBLEND;  }
+        if( secondHand == 55)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = LINEARBLEND; }
+    }
+}
+
+// This function fills the palette with totally random colors.
+void SetupTotallyRandomPalette()
+{
+    for( int i = 0; i < 16; ++i) {
+        currentPalette[i] = CHSV( random8(), 255, random8());
+    }
+}
+
+// This function sets up a palette of black and white stripes,
+// using code.  Since the palette is effectively an array of
+// sixteen CRGB colors, the various fill_* functions can be used
+// to set them up.
+void SetupBlackAndWhiteStripedPalette()
+{
+    // 'black out' all 16 palette entries...
+    fill_solid( currentPalette, 16, CRGB::Black);
+    // and set every fourth one to white.
+    currentPalette[0] = CRGB::White;
+    currentPalette[4] = CRGB::White;
+    currentPalette[8] = CRGB::White;
+    currentPalette[12] = CRGB::White;
+    
+}
+
+// This function sets up a palette of purple and green stripes.
+void SetupPurpleAndGreenPalette()
+{
+    CRGB purple = CHSV( HUE_PURPLE, 255, 255);
+    CRGB green  = CHSV( HUE_GREEN, 255, 255);
+    CRGB black  = CRGB::Black;
+    
+    currentPalette = CRGBPalette16(
+                                   green,  green,  black,  black,
+                                   purple, purple, black,  black,
+                                   green,  green,  black,  black,
+                                   purple, purple, black,  black );
+}
+
+
+// This example shows how to set up a static color palette
+// which is stored in PROGMEM (flash), which is almost always more
+// plentiful than RAM.  A static PROGMEM palette like this
+// takes up 64 bytes of flash.
+const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM =
+{
+    CRGB::Red,
+    CRGB::Gray, // 'white' is too bright compared to red and blue
+    CRGB::Blue,
+    CRGB::Black,
+    
+    CRGB::Red,
+    CRGB::Gray,
+    CRGB::Blue,
+    CRGB::Black,
+    
+    CRGB::Red,
+    CRGB::Red,
+    CRGB::Gray,
+    CRGB::Gray,
+    CRGB::Blue,
+    CRGB::Blue,
+    CRGB::Black,
+    CRGB::Black
+};
