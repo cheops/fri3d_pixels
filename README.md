@@ -16,6 +16,6 @@ Check following things:
 
 ## 3 effects:
 1. FastLED palettes
-1. shoot with a blaster at the badge IR-reciever to charge the led strip with your colour
+1. shoot with a blaster at the badge IR-reciever to charge the led strip with your colour  
    Once fully charged -->
 1. 1D Fireworks
