@@ -4,8 +4,14 @@
 
 #include <data.h>
 
-#define NEOPIXEL_PIN 13
-#define NUM_LEDS 300
+#define NUM_LEDS 300 // 60 * 5m
+// #define NUM_LEDS 432 // 144 * 3m
+// #define NUM_LEDS 480 // 96 * 5m
+
+#define NEOPIXEL_PIN 13  // SAO pin
+// #define NEOPIXEL_PIN 2   // SAO leds pin on Octopus 2022
+// #define NEOPIXEL_PIN 12  // SAO leds pin on Fox 2024
+
 #define RGB_ORDER RGB
 #define FRAMES_PER_SECOND 120
 
@@ -72,6 +78,7 @@ void setup()
     currentBlending = LINEARBLEND;    
 
     Data.init();
+    Serial.println("Ready running...");
 }
 
 void loop()

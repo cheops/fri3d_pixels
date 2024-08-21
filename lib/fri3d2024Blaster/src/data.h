@@ -14,7 +14,8 @@ const int ir_one_low_time = 3;
 const int ir_stop_high_time = 1;
 const int ir_stop_low_time = 1;
 const int pulse_train_lenght =  2 + ir_bit_lenght * 2 + 2;
-#define IR_IN1_PIN 11 // badge 2024
+// #define IR_IN1_PIN 11 // badge fox 2024
+#define IR_IN1_PIN 25 // badge octopus 2022
 
 enum TeamColor : uint8_t
 {
